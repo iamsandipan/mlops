@@ -1,0 +1,33 @@
+name: Claude CI/CD Integration
+
+on:
+  workflow_run:
+    workflows: [Build]
+    types: [completed]
+
+permissions:
+  actions: write # lets the skill dispatch and watch other workflows
+  contents: read
+
+jobs:
+  claude:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'master'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Run Claude skill
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ github.token }}
+          prompt: |
+            Build succeeded on master.
+            Use the run-workflows skill to run aws-s3-ls.yml, then report the result.
+          claude_args: >-
+            --allowedTools "Skill,Read,Bash(.claude/skills/run-workflows/run_sequence.sh:*)"
+          display_report: true
