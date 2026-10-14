@@ -12,6 +12,7 @@ All workflows live in [`.github/workflows/`](.github/workflows/).
 | Trigger | `trigger.yml` | Manual | Starts the Downstream workflow via `gh workflow run`, passing an environment input |
 | Downstream | `downstream.yml` | Manual or from Trigger | Prints the inputs it received; placeholder for real work such as a deploy |
 | AWS S3 List | `aws-s3-ls.yml` | Manual | Gets temporary AWS credentials from STS via OIDC and runs `aws s3 ls` |
+| SageMaker Pipeline | `sagemaker-pipeline.yml` | Push to `master` touching `pipeline/`, manual | Creates or updates the SageMaker pipeline in [`pipeline/`](pipeline/) (preprocess → train XGBoost → register model) and runs it. Needs `SAGEMAKER_ROLE_ARN` and `SAGEMAKER_BUCKET` repo variables |
 | Claude CI/CD Integration | `claude_cicd_integration.yml` | After a successful Build on `master` | Runs Claude Code via `anthropics/claude-code-action`, which uses the `run-workflows` skill to run AWS S3 List. Needs an `ANTHROPIC_API_KEY` repo secret |
 
 Run the manual workflows from **Actions → *workflow name* → Run workflow**.
