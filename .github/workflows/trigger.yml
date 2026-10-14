@@ -1,0 +1,32 @@
+name: Trigger
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to pass to the downstream workflow
+        required: true
+        default: staging
+        type: choice
+        options: [staging, production]
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger downstream workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          gh workflow run downstream.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$GITHUB_REF_NAME" \
+            -f environment="$ENVIRONMENT" \
+            -f triggered_by="$GITHUB_WORKFLOW #$GITHUB_RUN_NUMBER"
+          echo "Triggered downstream.yml on $GITHUB_REF_NAME with environment=$ENVIRONMENT"

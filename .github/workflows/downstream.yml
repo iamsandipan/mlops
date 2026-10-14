@@ -1,0 +1,29 @@
+name: Downstream
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        default: staging
+      triggered_by:
+        description: Workflow run that triggered this one
+        required: false
+        default: manual
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Show trigger details
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          TRIGGERED_BY: ${{ inputs.triggered_by }}
+        run: |
+          echo "Environment:  $ENVIRONMENT"
+          echo "Triggered by: $TRIGGERED_BY"
