@@ -1,0 +1,39 @@
+name: AWS S3 List
+
+on:
+  workflow_dispatch:
+    inputs:
+      bucket:
+        description: Bucket to list (leave empty to list all buckets)
+        required: false
+        default: ""
+
+permissions:
+  id-token: write # required to request the OIDC token exchanged with STS
+  contents: read
+
+jobs:
+  s3-ls:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get STS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-session-name: gha-${{ github.run_id }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Run s3 ls
+        shell: bash
+        env:
+          BUCKET: ${{ inputs.bucket }}
+        run: |
+          set -euo pipefail
+          echo "Authenticated as:"
+          aws sts get-caller-identity
+          if [ -n "$BUCKET" ]; then
+            aws s3 ls "s3://$BUCKET"
+          else
+            aws s3 ls
+          fi
