@@ -15,6 +15,24 @@ All workflows live in [`.github/workflows/`](.github/workflows/).
 
 Run the manual workflows from **Actions → *workflow name* → Run workflow**.
 
+## Claude Code skills
+
+Project skills for [Claude Code](https://claude.com/claude-code) live in [`.claude/skills/`](.claude/skills/), one folder per skill with a `SKILL.md`.
+
+| Skill | What it does |
+| --- | --- |
+| `add-workflow` | Adds a new GitHub Actions workflow following this repo's conventions |
+| `run-workflows` | Runs several workflows one after another, waiting for each to finish and stopping at the first failure |
+
+`run-workflows` needs the GitHub CLI (`brew install gh && gh auth login`). Its script can also be run directly:
+
+```bash
+.claude/skills/run-workflows/run_sequence.sh [--ref <branch>] <workflow>[:key=value,...] ...
+
+# Example: build, list S3, then run Downstream for staging
+.claude/skills/run-workflows/run_sequence.sh build.yml aws-s3-ls.yml downstream.yml:environment=staging
+```
+
 ## AWS setup
 
 The AWS S3 List workflow uses GitHub's OIDC provider to assume an IAM role, so no AWS access keys are stored in GitHub. One-time setup:
