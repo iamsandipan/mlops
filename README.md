@@ -58,6 +58,14 @@ kubectl apply -k kubernetes/api
 
 The HPA needs metrics-server (`minikube addons enable metrics-server`). The VPA needs the [Vertical Pod Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler) installed; without it, `kubectl apply` fails on `vpa.yaml`.
 
+[`kubernetes/karpenter/`](kubernetes/karpenter/) adds node autoscaling on EKS with [Karpenter](https://karpenter.sh/): a `NodePool` (spot and on-demand c/m/r instances, gen 5+, capped at 100 CPU / 400Gi, consolidates empty or underused nodes) and an `EC2NodeClass` (AL2023 AMI, IMDSv2, subnets and security groups found by the `karpenter.sh/discovery` tag). When the API's HPA adds pods that don't fit, Karpenter launches nodes for them.
+
+Karpenter itself must be installed first, including its IAM roles, interruption queue, and discovery tags; follow the [Getting Started guide](https://karpenter.sh/docs/getting-started/getting-started-with-karpenter/). Then apply the manifests with your cluster name filled in:
+
+```bash
+kubectl kustomize kubernetes/karpenter | sed "s/<CLUSTER_NAME>/$CLUSTER_NAME/g" | kubectl apply -f -
+```
+
 ## AWS setup
 
 The AWS S3 List workflow uses GitHub's OIDC provider to assume an IAM role, so no AWS access keys are stored in GitHub. One-time setup:

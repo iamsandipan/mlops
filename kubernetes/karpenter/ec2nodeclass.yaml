@@ -1,0 +1,24 @@
+# How Karpenter launches EC2 instances. Replace <CLUSTER_NAME> with your EKS
+# cluster name (see the README for a one-line sed).
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: default
+spec:
+  # IAM role for the nodes, created during Karpenter setup
+  role: "KarpenterNodeRole-<CLUSTER_NAME>"
+  # Latest Amazon Linux 2023 EKS AMI; pin a version (e.g. al2023@v20250101) in production
+  amiSelectorTerms:
+    - alias: al2023@latest
+  # Subnets and security groups tagged karpenter.sh/discovery=<CLUSTER_NAME>
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "<CLUSTER_NAME>"
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "<CLUSTER_NAME>"
+  # Block IMDS access from pods (IMDSv2, single hop)
+  metadataOptions:
+    httpEndpoint: enabled
+    httpTokens: required
+    httpPutResponseHopLimit: 1
