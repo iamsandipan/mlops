@@ -50,6 +50,12 @@ kubectl -n monitoring port-forward svc/prometheus 9090:9090   # http://localhost
 
 Override settings in `values.yaml` with `--set` or `-f`, e.g. `--set persistence.enabled=false` or `--set retention=30d`. Scrape jobs and alert rules are under `config` and `rules`.
 
+Plain manifests for an API live in [`kubernetes/api/`](kubernetes/api/): a Deployment (2 replicas, probes, resource limits, Prometheus scrape annotations) and a ClusterIP Service on port 80. The image is a placeholder (`hashicorp/http-echo`); swap in your own and adjust the container port.
+
+```bash
+kubectl apply -k kubernetes/api
+```
+
 ## AWS setup
 
 The AWS S3 List workflow uses GitHub's OIDC provider to assume an IAM role, so no AWS access keys are stored in GitHub. One-time setup:
