@@ -66,6 +66,23 @@ Karpenter itself must be installed first, including its IAM roles, interruption 
 kubectl kustomize kubernetes/karpenter | sed "s/<CLUSTER_NAME>/$CLUSTER_NAME/g" | kubectl apply -f -
 ```
 
+## AWS infrastructure
+
+Terraform in [`aws/`](aws/) creates a VPC and an EKS cluster across 3 availability zones, using the [`terraform-aws-modules`](https://github.com/terraform-aws-modules) VPC and EKS modules.
+
+- **VPC** (`10.0.0.0/16`): per AZ, a private `/20` for nodes and pods, a public `/24` for load balancers and NAT, and an intra `/24` for the EKS control plane. One NAT gateway per AZ by default (`single_nat_gateway = true` to save cost).
+- **EKS**: control plane in the intra subnets, nodes in the private subnets, public API endpoint, core add-ons (CoreDNS, kube-proxy, VPC CNI, Pod Identity Agent), and a managed node group of `m6i.large` (2–5 nodes, 3 desired).
+- Private subnets and the node security group are tagged `karpenter.sh/discovery=<cluster_name>`, matching [`kubernetes/karpenter/`](kubernetes/karpenter/).
+
+```bash
+cd aws
+terraform init
+terraform apply                       # override with -var cluster_name=... -var region=... etc.
+$(terraform output -raw configure_kubectl)
+```
+
+Creating the cluster takes about 15 minutes. EKS, NAT gateways, and nodes are billed while they run; `terraform destroy` removes everything.
+
 ## AWS setup
 
 The AWS S3 List workflow uses GitHub's OIDC provider to assume an IAM role, so no AWS access keys are stored in GitHub. One-time setup:
