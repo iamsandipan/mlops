@@ -68,20 +68,30 @@ kubectl kustomize kubernetes/karpenter | sed "s/<CLUSTER_NAME>/$CLUSTER_NAME/g" 
 
 ## AWS infrastructure
 
-Terraform in [`aws/`](aws/) creates a VPC and an EKS cluster across 3 availability zones, using the [`terraform-aws-modules`](https://github.com/terraform-aws-modules) VPC and EKS modules.
+Terraform in [`aws/`](aws/) creates an EKS cluster in each of two regions, each in its own VPC across 3 availability zones, using the [`terraform-aws-modules`](https://github.com/terraform-aws-modules) VPC and EKS modules.
 
-- **VPC** (`10.0.0.0/16`): per AZ, a private `/20` for nodes and pods, a public `/24` for load balancers and NAT, and an intra `/24` for the EKS control plane. One NAT gateway per AZ by default (`single_nat_gateway = true` to save cost).
+| Path | What it is |
+| --- | --- |
+| `aws/modules/eks-cluster/` | Reusable module: one VPC and one EKS cluster in the provider's region |
+| `aws/regions/us-east-1/` | Cluster `mlops-us-east-1`, VPC `10.0.0.0/16` |
+| `aws/regions/us-west-2/` | Cluster `mlops-us-west-2`, VPC `10.1.0.0/16` |
+
+Each region is a separate Terraform root with its own state, so an outage or a failed apply in one region doesn't block changes to the other. VPC CIDRs don't overlap, so the VPCs can be peered or joined with a Transit Gateway later. To add a region, copy one of the `regions/` folders and change the region, cluster name, and CIDR.
+
+Per cluster:
+
+- **VPC**: per AZ, a private `/20` for nodes and pods, a public `/24` for load balancers and NAT, and an intra `/24` for the EKS control plane. One NAT gateway per AZ by default (`single_nat_gateway = true` to save cost).
 - **EKS**: control plane in the intra subnets, nodes in the private subnets, public API endpoint, core add-ons (CoreDNS, kube-proxy, VPC CNI, Pod Identity Agent), and a managed node group of `m6i.large` (2–5 nodes, 3 desired).
-- Private subnets and the node security group are tagged `karpenter.sh/discovery=<cluster_name>`, matching [`kubernetes/karpenter/`](kubernetes/karpenter/).
+- Private subnets and the node security group are tagged `karpenter.sh/discovery=<cluster_name>`, matching [`kubernetes/karpenter/`](kubernetes/karpenter/) (set `CLUSTER_NAME` to the region's cluster when applying it).
 
 ```bash
-cd aws
+cd aws/regions/us-east-1              # then repeat for us-west-2
 terraform init
-terraform apply                       # override with -var cluster_name=... -var region=... etc.
+terraform apply
 $(terraform output -raw configure_kubectl)
 ```
 
-Creating the cluster takes about 15 minutes. EKS, NAT gateways, and nodes are billed while they run; `terraform destroy` removes everything.
+Creating a cluster takes about 15 minutes. EKS, NAT gateways, and nodes are billed while they run, in every region; `terraform destroy` in each region folder removes everything.
 
 ## AWS setup
 

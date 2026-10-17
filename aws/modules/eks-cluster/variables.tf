@@ -1,25 +1,17 @@
-variable "region" {
-  description = "AWS region to deploy into"
+variable "cluster_name" {
+  description = "Name of the EKS cluster; also used to name the VPC and for Karpenter discovery tags. Make it unique per region, since IAM roles are global"
   type        = string
-  default     = "us-east-1"
 }
 
-variable "cluster_name" {
-  description = "Name of the EKS cluster; also used to name the VPC and for Karpenter discovery tags"
+variable "vpc_cidr" {
+  description = "CIDR block for the VPC. Use non-overlapping ranges across regions so the VPCs can be peered later"
   type        = string
-  default     = "mlops"
 }
 
 variable "kubernetes_version" {
   description = "Kubernetes version for the EKS control plane"
   type        = string
   default     = "1.34"
-}
-
-variable "vpc_cidr" {
-  description = "CIDR block for the VPC"
-  type        = string
-  default     = "10.0.0.0/16"
 }
 
 variable "single_nat_gateway" {

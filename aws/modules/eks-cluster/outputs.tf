@@ -1,5 +1,5 @@
 output "region" {
-  value = var.region
+  value = data.aws_region.current.region
 }
 
 output "cluster_name" {
@@ -14,6 +14,10 @@ output "vpc_id" {
   value = module.vpc.vpc_id
 }
 
+output "vpc_cidr" {
+  value = module.vpc.vpc_cidr_block
+}
+
 output "private_subnets" {
   value = module.vpc.private_subnets
 }
@@ -24,5 +28,5 @@ output "availability_zones" {
 
 output "configure_kubectl" {
   description = "Command to add the cluster to your kubeconfig"
-  value       = "aws eks update-kubeconfig --region ${var.region} --name ${module.eks.cluster_name}"
+  value       = "aws eks update-kubeconfig --region ${data.aws_region.current.region} --name ${module.eks.cluster_name}"
 }
