@@ -35,6 +35,21 @@ Project skills for [Claude Code](https://claude.com/claude-code) live in [`.clau
 .claude/skills/run-workflows/run_sequence.sh build.yml aws-s3-ls.yml downstream.yml:environment=staging
 ```
 
+## Kubernetes
+
+Helm charts live in [`kubernetes/`](kubernetes/).
+
+| Chart | What it installs |
+| --- | --- |
+| `prometheus` | Prometheus server (`prom/prometheus`) with RBAC for Kubernetes service discovery, a PVC for TSDB data, and scrape jobs for the API server, nodes, cAdvisor, and pods annotated `prometheus.io/scrape: "true"` |
+
+```bash
+helm install prometheus kubernetes/prometheus -n monitoring --create-namespace
+kubectl -n monitoring port-forward svc/prometheus 9090:9090   # http://localhost:9090
+```
+
+Override settings in `values.yaml` with `--set` or `-f`, e.g. `--set persistence.enabled=false` or `--set retention=30d`. Scrape jobs and alert rules are under `config` and `rules`.
+
 ## AWS setup
 
 The AWS S3 List workflow uses GitHub's OIDC provider to assume an IAM role, so no AWS access keys are stored in GitHub. One-time setup:

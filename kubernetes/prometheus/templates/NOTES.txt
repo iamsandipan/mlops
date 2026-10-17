@@ -1,0 +1,9 @@
+Prometheus is installed in namespace {{ .Release.Namespace }}.
+
+Open the UI:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "prometheus.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+  then browse to http://localhost:{{ .Values.service.port }}
+
+To have Prometheus scrape a pod, annotate it with:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "<metrics port>"
