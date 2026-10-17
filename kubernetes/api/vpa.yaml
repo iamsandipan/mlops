@@ -1,0 +1,26 @@
+# Requires the Vertical Pod Autoscaler to be installed in the cluster:
+# https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: api
+  labels:
+    app: api
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api
+  updatePolicy:
+    # Evicts pods to apply new requests; the HPA keeps at least 2 running
+    updateMode: Recreate
+  resourcePolicy:
+    containerPolicies:
+      - containerName: api
+        # Memory only: the HPA scales on CPU utilization, which is measured
+        # against CPU requests, so the VPA must not change those
+        controlledResources: [memory]
+        minAllowed:
+          memory: 64Mi
+        maxAllowed:
+          memory: 1Gi

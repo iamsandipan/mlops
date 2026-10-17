@@ -50,11 +50,13 @@ kubectl -n monitoring port-forward svc/prometheus 9090:9090   # http://localhost
 
 Override settings in `values.yaml` with `--set` or `-f`, e.g. `--set persistence.enabled=false` or `--set retention=30d`. Scrape jobs and alert rules are under `config` and `rules`.
 
-Plain manifests for an API live in [`kubernetes/api/`](kubernetes/api/): a Deployment (2 replicas, probes, resource limits, Prometheus scrape annotations) and a ClusterIP Service on port 80. The image is a placeholder (`hashicorp/http-echo`); swap in your own and adjust the container port.
+Plain manifests for an API live in [`kubernetes/api/`](kubernetes/api/): a Deployment (probes, resource limits, Prometheus scrape annotations), a ClusterIP Service on port 80, an HPA (2–10 replicas at 70% CPU), and a VPA that adjusts memory requests only so it doesn't conflict with the HPA. The image is a placeholder (`hashicorp/http-echo`); swap in your own and adjust the container port.
 
 ```bash
 kubectl apply -k kubernetes/api
 ```
+
+The HPA needs metrics-server (`minikube addons enable metrics-server`). The VPA needs the [Vertical Pod Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler) installed; without it, `kubectl apply` fails on `vpa.yaml`.
 
 ## AWS setup
 

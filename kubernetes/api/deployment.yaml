@@ -5,7 +5,7 @@ metadata:
   labels:
     app: api
 spec:
-  replicas: 2
+  # No replicas field: the HPA owns the replica count
   selector:
     matchLabels:
       app: api
