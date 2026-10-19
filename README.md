@@ -60,7 +60,7 @@ The HPA needs metrics-server (`minikube addons enable metrics-server`). The VPA 
 
 [`kubernetes/secret-rotation/`](kubernetes/secret-rotation/) is a Helm chart that keeps Kubernetes Secrets in sync with AWS Secrets Manager using the [External Secrets Operator](https://external-secrets.io/) (ESO). Rotate a secret in Secrets Manager and ESO writes the new value into the Kubernetes Secret within `refreshInterval` (default 1h). It can also generate in-cluster passwords that ESO replaces every `rotateEvery`, for values only the cluster uses, such as session signing keys. List secrets under `secrets` and `generated` in `values.yaml`.
 
-Install ESO first, give its service account read access to Secrets Manager (EKS Pod Identity association with `secretsmanager:GetSecretValue` and `secretsmanager:DescribeSecret`, or set `store.serviceAccount` to use IRSA), then install the chart in each cluster with that cluster's region:
+Install ESO first. The Terraform in [`aws/`](aws/) already gives its service account (`external-secrets/external-secrets`) read access to Secrets Manager secrets named `mlops/*` through EKS Pod Identity; set `store.serviceAccount` only if you use IRSA instead. Then install the chart in each cluster with that cluster's region:
 
 ```bash
 helm repo add external-secrets https://charts.external-secrets.io
@@ -95,6 +95,7 @@ Per cluster:
 
 - **VPC**: per AZ, a private `/20` for nodes and pods, a public `/24` for load balancers and NAT, and an intra `/24` for the EKS control plane. One NAT gateway per AZ by default (`single_nat_gateway = true` to save cost).
 - **EKS**: control plane in the intra subnets, nodes in the private subnets, public API endpoint, core add-ons (CoreDNS, kube-proxy, VPC CNI, Pod Identity Agent), and a managed node group of `m6i.large` (2–5 nodes, 3 desired).
+- **External Secrets IAM**: a role `<cluster_name>-external-secrets` that can read Secrets Manager secrets matching `external_secrets_secret_prefixes` (default `mlops/*`) in the cluster's region, linked by EKS Pod Identity to the `external-secrets` service account in the `external-secrets` namespace. Used by [`kubernetes/secret-rotation/`](kubernetes/secret-rotation/). Add `external_secrets_kms_key_arns` if the secrets use a customer-managed KMS key.
 - Private subnets and the node security group are tagged `karpenter.sh/discovery=<cluster_name>`, matching [`kubernetes/karpenter/`](kubernetes/karpenter/) (set `CLUSTER_NAME` to the region's cluster when applying it).
 
 ```bash

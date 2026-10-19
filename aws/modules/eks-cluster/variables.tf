@@ -40,3 +40,33 @@ variable "node_desired_size" {
   type    = number
   default = 3
 }
+
+variable "enable_external_secrets" {
+  description = "Create the IAM role and Pod Identity association for the External Secrets Operator"
+  type        = bool
+  default     = true
+}
+
+variable "external_secrets_namespace" {
+  description = "Namespace ESO is installed in"
+  type        = string
+  default     = "external-secrets"
+}
+
+variable "external_secrets_service_account" {
+  description = "ESO controller service account (the Helm chart names it after the release)"
+  type        = string
+  default     = "external-secrets"
+}
+
+variable "external_secrets_secret_prefixes" {
+  description = "Secrets Manager secret names ESO may read, as ARN name patterns in this region (e.g. \"mlops/*\")"
+  type        = list(string)
+  default     = ["mlops/*"]
+}
+
+variable "external_secrets_kms_key_arns" {
+  description = "Customer-managed KMS keys the secrets are encrypted with; leave empty for the default aws/secretsmanager key"
+  type        = list(string)
+  default     = []
+}

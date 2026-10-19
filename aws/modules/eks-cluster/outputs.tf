@@ -30,3 +30,8 @@ output "configure_kubectl" {
   description = "Command to add the cluster to your kubeconfig"
   value       = "aws eks update-kubeconfig --region ${data.aws_region.current.region} --name ${module.eks.cluster_name}"
 }
+
+output "external_secrets_role_arn" {
+  description = "IAM role the External Secrets Operator assumes through Pod Identity"
+  value       = one(aws_iam_role.external_secrets[*].arn)
+}
