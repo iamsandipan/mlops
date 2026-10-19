@@ -1,31 +1,11 @@
 # IAM role for the External Secrets Operator (kubernetes/secret-rotation), linked to
 # its service account with EKS Pod Identity so the SecretStore needs no auth block.
 
-data "aws_caller_identity" "current" {}
-data "aws_partition" "current" {}
-
 locals {
   external_secrets_arns = [
     for prefix in var.external_secrets_secret_prefixes :
     "arn:${data.aws_partition.current.partition}:secretsmanager:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:secret:${prefix}"
   ]
-}
-
-data "aws_iam_policy_document" "external_secrets_trust" {
-  statement {
-    actions = ["sts:AssumeRole", "sts:TagSession"]
-
-    principals {
-      type        = "Service"
-      identifiers = ["pods.eks.amazonaws.com"]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:SourceAccount"
-      values   = [data.aws_caller_identity.current.account_id]
-    }
-  }
 }
 
 data "aws_iam_policy_document" "external_secrets" {
@@ -56,7 +36,7 @@ resource "aws_iam_role" "external_secrets" {
 
   # IAM is global; the cluster name already includes the region
   name               = "${var.cluster_name}-external-secrets"
-  assume_role_policy = data.aws_iam_policy_document.external_secrets_trust.json
+  assume_role_policy = data.aws_iam_policy_document.pod_identity_trust.json
 }
 
 resource "aws_iam_role_policy" "external_secrets" {

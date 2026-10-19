@@ -70,3 +70,21 @@ variable "external_secrets_kms_key_arns" {
   type        = list(string)
   default     = []
 }
+
+variable "enable_vault" {
+  description = "Create the KMS auto-unseal key and the IAM role and Pod Identity association for Vault"
+  type        = bool
+  default     = true
+}
+
+variable "vault_namespace" {
+  description = "Namespace Vault is installed in"
+  type        = string
+  default     = "vault"
+}
+
+variable "vault_service_account" {
+  description = "Vault server service account (server.serviceAccount.name in kubernetes/vault)"
+  type        = string
+  default     = "vault"
+}

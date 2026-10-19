@@ -35,3 +35,13 @@ output "external_secrets_role_arn" {
   description = "IAM role the External Secrets Operator assumes through Pod Identity"
   value       = one(aws_iam_role.external_secrets[*].arn)
 }
+
+output "vault_kms_key_alias" {
+  description = "KMS key alias for Vault auto-unseal; set as global.awsKms.keyId in kubernetes/vault"
+  value       = one(aws_kms_alias.vault_unseal[*].name)
+}
+
+output "vault_role_arn" {
+  description = "IAM role Vault assumes through Pod Identity"
+  value       = one(aws_iam_role.vault[*].arn)
+}

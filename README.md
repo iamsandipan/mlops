@@ -77,6 +77,18 @@ Pods that read secrets as environment variables keep the old value until they re
 helm install configmaps kubernetes/configmaps -n default -f my-configmaps.yaml
 ```
 
+[`kubernetes/vault/`](kubernetes/vault/) is a Helm chart that installs [HashiCorp Vault](https://developer.hashicorp.com/vault) (upstream chart `hashicorp/vault` 0.34.1, Vault 2.0.4) as a 3-pod HA cluster with integrated Raft storage, one pod per AZ, auto-unsealed by the AWS KMS key and IAM role from [`aws/`](aws/). The sidecar injector is off; apps get Vault secrets through the External Secrets Operator. Set the region and key alias per cluster:
+
+```bash
+helm dependency build kubernetes/vault
+helm install vault kubernetes/vault -n vault --create-namespace \
+  --set global.awsKms.region=us-east-1 \
+  --set global.awsKms.keyId=alias/vault-unseal-mlops-us-east-1
+kubectl -n vault exec -it vault-0 -- vault operator init   # prints recovery keys and a root token; store them safely
+```
+
+The other pods join through `retry_join` and every pod unseals itself with KMS on start. Vault serves plain HTTP inside the cluster; configure TLS in the listener before production use.
+
 [`kubernetes/karpenter/`](kubernetes/karpenter/) adds node autoscaling on EKS with [Karpenter](https://karpenter.sh/): a `NodePool` (spot and on-demand c/m/r instances, gen 5+, capped at 100 CPU / 400Gi, consolidates empty or underused nodes) and an `EC2NodeClass` (AL2023 AMI, IMDSv2, subnets and security groups found by the `karpenter.sh/discovery` tag). When the API's HPA adds pods that don't fit, Karpenter launches nodes for them.
 
 Karpenter itself must be installed first, including its IAM roles, interruption queue, and discovery tags; follow the [Getting Started guide](https://karpenter.sh/docs/getting-started/getting-started-with-karpenter/). Then apply the manifests with your cluster name filled in:
@@ -102,6 +114,7 @@ Per cluster:
 - **VPC**: per AZ, a private `/20` for nodes and pods, a public `/24` for load balancers and NAT, and an intra `/24` for the EKS control plane. One NAT gateway per AZ by default (`single_nat_gateway = true` to save cost).
 - **EKS**: control plane in the intra subnets, nodes in the private subnets, public API endpoint, core add-ons (CoreDNS, kube-proxy, VPC CNI, Pod Identity Agent), and a managed node group of `m6i.large` (2–5 nodes, 3 desired).
 - **External Secrets IAM**: a role `<cluster_name>-external-secrets` that can read Secrets Manager secrets matching `external_secrets_secret_prefixes` (default `mlops/*`) in the cluster's region, linked by EKS Pod Identity to the `external-secrets` service account in the `external-secrets` namespace. Used by [`kubernetes/secret-rotation/`](kubernetes/secret-rotation/). Add `external_secrets_kms_key_arns` if the secrets use a customer-managed KMS key.
+- **Vault KMS**: a KMS key `alias/vault-unseal-<cluster_name>` (yearly rotation, 30-day deletion window) and a role `<cluster_name>-vault` allowed to encrypt and decrypt with it, linked by EKS Pod Identity to the `vault` service account in the `vault` namespace. Used by [`kubernetes/vault/`](kubernetes/vault/) for auto-unseal.
 - Private subnets and the node security group are tagged `karpenter.sh/discovery=<cluster_name>`, matching [`kubernetes/karpenter/`](kubernetes/karpenter/) (set `CLUSTER_NAME` to the region's cluster when applying it).
 
 ```bash

@@ -1,0 +1,80 @@
+global:
+  # Used by the seal "awskms" block below. Set per cluster: the key and the IAM
+  # role Vault uses come from aws/modules/eks-cluster/vault.tf
+  #   terraform output -json cluster | jq -r .vault_kms_key_alias
+  awsKms:
+    region: us-east-1
+    keyId: alias/vault-unseal-mlops-us-east-1
+
+# Values for the upstream hashicorp/vault chart
+vault:
+  # Secrets reach pods through the External Secrets Operator (kubernetes/secret-rotation),
+  # not the sidecar injector
+  injector:
+    enabled: false
+
+  server:
+    # The Pod Identity association in Terraform targets this service account
+    serviceAccount:
+      name: vault
+
+    dataStorage:
+      enabled: true
+      size: 10Gi
+    auditStorage:
+      enabled: true
+      size: 10Gi
+
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
+
+    # One pod per AZ, on top of the chart's default one-pod-per-node anti-affinity
+    topologySpreadConstraints: |
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: {{ template "vault.name" . }}
+            app.kubernetes.io/instance: {{ .Release.Name }}
+            component: server
+
+    ha:
+      enabled: true
+      replicas: 3
+      raft:
+        enabled: true
+        setNodeId: true
+        # Rendered with tpl by the upstream chart
+        config: |
+          ui = true
+
+          listener "tcp" {
+            # Plain HTTP inside the cluster. For production, mount certificates
+            # (e.g. from cert-manager) and set tls_cert_file / tls_key_file.
+            tls_disable     = 1
+            address         = "[::]:8200"
+            cluster_address = "[::]:8201"
+          }
+
+          storage "raft" {
+            path = "/vault/data"
+            {{- $fullname := include "vault.fullname" . }}
+            {{- range $i := until (int .Values.server.ha.replicas) }}
+            retry_join {
+              leader_api_addr = "http://{{ $fullname }}-{{ $i }}.{{ $fullname }}-internal:8200"
+            }
+            {{- end }}
+          }
+
+          # Unseals automatically on every pod start using the KMS key; no unseal keys
+          seal "awskms" {
+            region     = "{{ .Values.global.awsKms.region }}"
+            kms_key_id = "{{ .Values.global.awsKms.keyId }}"
+          }
+
+          service_registration "kubernetes" {}
