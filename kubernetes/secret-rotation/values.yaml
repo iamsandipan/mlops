@@ -1,0 +1,42 @@
+# Requires the External Secrets Operator (external-secrets.io/v1 API) in the cluster.
+# See README.md for install steps and IAM permissions.
+
+# AWS region of the Secrets Manager secrets; set per cluster in a multi-region setup
+region: us-east-1
+
+# How often ESO re-reads each secret. A rotation in Secrets Manager reaches the
+# Kubernetes Secret within this interval.
+refreshInterval: 1h
+
+store:
+  # Defaults to the release's full name
+  name: ""
+  # Leave empty to use the ESO controller's own AWS credentials (EKS Pod Identity).
+  # Set to a service account in this namespace to use IRSA instead.
+  serviceAccount: ""
+
+# Secrets synced from AWS Secrets Manager. Rotate them there (built-in or Lambda
+# rotation) and ESO picks up the new value.
+secrets: []
+#  # Every key of a JSON secret becomes a key in the Kubernetes Secret
+#  - name: api-db
+#    remoteKey: mlops/api/db
+#
+#  # Or pick individual keys
+#  - name: api-keys
+#    refreshInterval: 15m
+#    data:
+#      - secretKey: STRIPE_KEY
+#        remoteRef:
+#          key: mlops/api/stripe
+#          property: key
+
+# Passwords generated in the cluster and replaced every rotateEvery. Only use these
+# for values nothing outside the cluster needs to know (e.g. session signing keys);
+# a database password rotated here would no longer match the database.
+generated: []
+#  - name: api-session-key
+#    rotateEvery: 720h
+#    length: 32
+#    digits: 5
+#    symbols: 5

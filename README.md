@@ -58,6 +58,19 @@ kubectl apply -k kubernetes/api
 
 The HPA needs metrics-server (`minikube addons enable metrics-server`). The VPA needs the [Vertical Pod Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler) installed; without it, `kubectl apply` fails on `vpa.yaml`.
 
+[`kubernetes/secret-rotation/`](kubernetes/secret-rotation/) is a Helm chart that keeps Kubernetes Secrets in sync with AWS Secrets Manager using the [External Secrets Operator](https://external-secrets.io/) (ESO). Rotate a secret in Secrets Manager and ESO writes the new value into the Kubernetes Secret within `refreshInterval` (default 1h). It can also generate in-cluster passwords that ESO replaces every `rotateEvery`, for values only the cluster uses, such as session signing keys. List secrets under `secrets` and `generated` in `values.yaml`.
+
+Install ESO first, give its service account read access to Secrets Manager (EKS Pod Identity association with `secretsmanager:GetSecretValue` and `secretsmanager:DescribeSecret`, or set `store.serviceAccount` to use IRSA), then install the chart in each cluster with that cluster's region:
+
+```bash
+helm repo add external-secrets https://charts.external-secrets.io
+helm install external-secrets external-secrets/external-secrets -n external-secrets --create-namespace
+helm install secret-rotation kubernetes/secret-rotation -n default --set region=us-east-1 -f my-secrets.yaml
+kubectl get externalsecrets
+```
+
+Pods that read secrets as environment variables keep the old value until they restart; [Stakater Reloader](https://github.com/stakater/Reloader) with the `reloader.stakater.com/auto: "true"` annotation restarts them on each rotation.
+
 [`kubernetes/karpenter/`](kubernetes/karpenter/) adds node autoscaling on EKS with [Karpenter](https://karpenter.sh/): a `NodePool` (spot and on-demand c/m/r instances, gen 5+, capped at 100 CPU / 400Gi, consolidates empty or underused nodes) and an `EC2NodeClass` (AL2023 AMI, IMDSv2, subnets and security groups found by the `karpenter.sh/discovery` tag). When the API's HPA adds pods that don't fit, Karpenter launches nodes for them.
 
 Karpenter itself must be installed first, including its IAM roles, interruption queue, and discovery tags; follow the [Getting Started guide](https://karpenter.sh/docs/getting-started/getting-started-with-karpenter/). Then apply the manifests with your cluster name filled in:

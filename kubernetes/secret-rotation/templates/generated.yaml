@@ -1,0 +1,34 @@
+{{- range .Values.generated }}
+---
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "secret-rotation.labels" $ | nindent 4 }}
+spec:
+  length: {{ hasKey . "length" | ternary (get . "length") 32 }}
+  digits: {{ hasKey . "digits" | ternary (get . "digits") 5 }}
+  symbols: {{ hasKey . "symbols" | ternary (get . "symbols") 5 }}
+  noUpper: false
+  allowRepeat: true
+---
+# A new password is generated every refreshInterval; the Secret key is "password"
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "secret-rotation.labels" $ | nindent 4 }}
+spec:
+  refreshInterval: {{ required (printf "generated[%s]: set rotateEvery" .name) .rotateEvery }}
+  target:
+    name: {{ .name }}
+    creationPolicy: Owner
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: Password
+          name: {{ .name }}
+{{- end }}

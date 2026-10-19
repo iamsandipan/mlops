@@ -1,0 +1,8 @@
+SecretStore {{ include "secret-rotation.storeName" . }} reads AWS Secrets Manager in {{ .Values.region }}.
+
+Check sync status:
+  kubectl -n {{ .Release.Namespace }} get externalsecrets
+
+Pods that read secrets as environment variables keep the old value until they
+restart. Annotate their Deployments with reloader.stakater.com/auto: "true" and
+install Stakater Reloader to restart them on every rotation.
