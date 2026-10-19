@@ -71,6 +71,12 @@ kubectl get externalsecrets
 
 Pods that read secrets as environment variables keep the old value until they restart; [Stakater Reloader](https://github.com/stakater/Reloader) with the `reloader.stakater.com/auto: "true"` annotation restarts them on each rotation.
 
+[`kubernetes/configmaps/`](kubernetes/configmaps/) is a Helm chart that creates ConfigMaps listed under `configMaps` in `values.yaml`, from key/value pairs (`data`; numbers and booleans are quoted for you), from files bundled in the chart (`files: files/api/*`, one key per file name), or both. Each entry can set `labels`, `annotations`, and `immutable`. Put files in a `files/` folder inside the chart. [`examples/etcd.yaml`](kubernetes/configmaps/examples/etcd.yaml) is a complete sample: the shared `ETCD_*` settings for a 3-member etcd StatefulSet, with the per-member env vars the pods add. Like Secrets, ConfigMaps read as environment variables only take effect after a pod restart; the Reloader annotation `reloader.stakater.com/auto: "true"` on a Deployment handles that.
+
+```bash
+helm install configmaps kubernetes/configmaps -n default -f my-configmaps.yaml
+```
+
 [`kubernetes/karpenter/`](kubernetes/karpenter/) adds node autoscaling on EKS with [Karpenter](https://karpenter.sh/): a `NodePool` (spot and on-demand c/m/r instances, gen 5+, capped at 100 CPU / 400Gi, consolidates empty or underused nodes) and an `EC2NodeClass` (AL2023 AMI, IMDSv2, subnets and security groups found by the `karpenter.sh/discovery` tag). When the API's HPA adds pods that don't fit, Karpenter launches nodes for them.
 
 Karpenter itself must be installed first, including its IAM roles, interruption queue, and discovery tags; follow the [Getting Started guide](https://karpenter.sh/docs/getting-started/getting-started-with-karpenter/). Then apply the manifests with your cluster name filled in:

@@ -1,0 +1,29 @@
+# Labels and annotations added to every ConfigMap
+commonLabels: {}
+commonAnnotations: {}
+
+# See examples/ for complete samples, e.g. examples/etcd.yaml
+configMaps: []
+#  # Key/value pairs, e.g. for envFrom. Numbers and booleans are quoted for you
+#  # (quote integers above 2^53 yourself; Helm reads numbers as floats);
+#  # multi-line strings are written as block scalars.
+#  - name: api-config
+#    data:
+#      LOG_LEVEL: info
+#      WORKERS: 4
+#      FEATURE_X_ENABLED: true
+#
+#  # Files from the chart's files/ directory, one key per file name.
+#  # Glob is relative to the chart root.
+#  - name: api-files
+#    files: files/api/*
+#    annotations:
+#      # Restart Deployments annotated for Stakater Reloader when this changes
+#      reloader.stakater.com/match: "true"
+#
+#  # Immutable ConfigMaps can't be edited, only replaced; the kubelet stops
+#  # watching them, which lowers API server load in large clusters
+#  - name: api-static
+#    immutable: true
+#    data:
+#      REGION: us-east-1

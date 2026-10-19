@@ -1,0 +1,40 @@
+{{- range .Values.configMaps }}
+{{- if not (or .data .files) }}
+{{- fail (printf "configMaps[%s]: set data or files" .name) }}
+{{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ required "configMaps[]: name is required" .name }}
+  labels:
+    {{- include "configmaps.labels" $ | nindent 4 }}
+    {{- with .labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- $annotations := merge (dict) (.annotations | default dict) $.Values.commonAnnotations }}
+  {{- with $annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- if .immutable }}
+immutable: true
+{{- end }}
+data:
+  {{- range $key, $value := .data }}
+  {{- /* Helm parses YAML numbers as float64; print whole numbers without an exponent */}}
+  {{- if and (kindIs "float64" $value) (eq $value (floor $value)) }}
+  {{- $value = int64 $value }}
+  {{- end }}
+  {{- $value = toString $value }}
+  {{- if contains "\n" $value }}
+  {{ $key }}: {{ hasSuffix "\n" $value | ternary "|" "|-" }}
+    {{- $value | trimSuffix "\n" | nindent 4 }}
+  {{- else }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- end }}
+  {{- with .files }}
+  {{- ($.Files.Glob .).AsConfig | nindent 2 }}
+  {{- end }}
+{{- end }}

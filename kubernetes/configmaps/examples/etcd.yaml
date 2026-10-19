@@ -1,0 +1,66 @@
+# Shared configuration for a 3-member etcd cluster run as a StatefulSet named
+# "etcd" behind a headless Service "etcd" in the "default" namespace.
+#
+#   helm install etcd-config kubernetes/configmaps -f kubernetes/configmaps/examples/etcd.yaml
+#
+# etcd reads ETCD_* environment variables (one per command-line flag). These are
+# set as env vars rather than an etcd.conf.yml file because etcd ignores env vars
+# and flags when --config-file is used, and each member needs its own name and
+# URLs. The StatefulSet loads this ConfigMap and adds the per-member values:
+#
+#   containers:
+#     - name: etcd
+#       image: quay.io/coreos/etcd:v3.6.0   # use the latest v3.6 patch release
+#       envFrom:
+#         - configMapRef:
+#             name: etcd-config
+#       env:
+#         - name: POD_NAME
+#           valueFrom:
+#             fieldRef:
+#               fieldPath: metadata.name
+#         - name: ETCD_NAME
+#           value: $(POD_NAME)
+#         - name: ETCD_ADVERTISE_CLIENT_URLS
+#           value: http://$(POD_NAME).etcd.default.svc.cluster.local:2379
+#         - name: ETCD_INITIAL_ADVERTISE_PEER_URLS
+#           value: http://$(POD_NAME).etcd.default.svc.cluster.local:2380
+#
+# This uses plain HTTP. For production, enable TLS (ETCD_CERT_FILE, ETCD_KEY_FILE,
+# ETCD_PEER_*), with the certificates in a Secret, e.g. from kubernetes/secret-rotation.
+
+configMaps:
+  - name: etcd-config
+    labels:
+      app.kubernetes.io/component: etcd
+    annotations:
+      # Restart the StatefulSet when this changes (Stakater Reloader)
+      reloader.stakater.com/match: "true"
+    data:
+      ETCD_DATA_DIR: /var/run/etcd/default.etcd
+
+      # Listen on all interfaces; the advertised URLs are set per pod
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+      ETCD_LISTEN_PEER_URLS: http://0.0.0.0:2380
+      # Plain-HTTP /metrics and /health for Prometheus and probes
+      ETCD_LISTEN_METRICS_URLS: http://0.0.0.0:2381
+
+      # Bootstrap membership. Once the cluster has formed, change STATE to
+      # "existing" before adding or replacing members.
+      ETCD_INITIAL_CLUSTER: >-
+        etcd-0=http://etcd-0.etcd.default.svc.cluster.local:2380,etcd-1=http://etcd-1.etcd.default.svc.cluster.local:2380,etcd-2=http://etcd-2.etcd.default.svc.cluster.local:2380
+      ETCD_INITIAL_CLUSTER_STATE: new
+      ETCD_INITIAL_CLUSTER_TOKEN: etcd-default
+
+      # Keep 1 hour of history, then compact
+      ETCD_AUTO_COMPACTION_MODE: periodic
+      ETCD_AUTO_COMPACTION_RETENTION: 1h
+      # 2 GiB backend quota (etcd raises a NOSPACE alarm past this)
+      ETCD_QUOTA_BACKEND_BYTES: 2147483648
+      ETCD_SNAPSHOT_COUNT: 10000
+
+      # Raft timing in ms; raise both on slow or cross-AZ networks
+      ETCD_HEARTBEAT_INTERVAL: 100
+      ETCD_ELECTION_TIMEOUT: 1000
+
+      ETCD_LOG_LEVEL: info
