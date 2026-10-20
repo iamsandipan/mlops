@@ -1,0 +1,18 @@
+{{- if eq .Values.kind "Job" }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "gpu-workload.fullname" . }}
+  labels:
+    {{- include "gpu-workload.labels" . | nindent 4 }}
+spec:
+  backoffLimit: {{ .Values.job.backoffLimit }}
+  ttlSecondsAfterFinished: {{ .Values.job.ttlSecondsAfterFinished }}
+  {{- with .Values.job.activeDeadlineSeconds }}
+  activeDeadlineSeconds: {{ . }}
+  {{- end }}
+  template:
+    {{- include "gpu-workload.podTemplate" . | nindent 4 }}
+{{- else if ne .Values.kind "Deployment" }}
+{{- fail (printf "kind must be Job or Deployment, got %q" .Values.kind) }}
+{{- end }}

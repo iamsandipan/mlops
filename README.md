@@ -108,7 +108,28 @@ helm install istio-ingress kubernetes/istio/gateway -n istio-ingress --create-na
 
 [`examples/api-routing.yaml`](kubernetes/istio/examples/api-routing.yaml) routes traffic from the gateway to the API in `kubernetes/api/`, with a timeout and retries; label the namespace `istio-injection=enabled` and restart the API so its pods get sidecars.
 
-[`kubernetes/karpenter/`](kubernetes/karpenter/) adds node autoscaling on EKS with [Karpenter](https://karpenter.sh/): a `NodePool` (spot and on-demand c/m/r instances, gen 5+, capped at 100 CPU / 400Gi, consolidates empty or underused nodes) and an `EC2NodeClass` (AL2023 AMI, IMDSv2, subnets and security groups found by the `karpenter.sh/discovery` tag). When the API's HPA adds pods that don't fit, Karpenter launches nodes for them.
+[`kubernetes/gpu/`](kubernetes/gpu/) runs workloads on NVIDIA GPUs. GPU nodes come from the `gpu` Karpenter pool in [`kubernetes/karpenter/`](kubernetes/karpenter/) (g5/g6/g6e, tainted `nvidia.com/gpu`, at most 16 GPUs, removed after 5 idle minutes), which boots the EKS NVIDIA AMI with the driver and container toolkit preinstalled.
+
+| Chart | What it does |
+| --- | --- |
+| `operator` | NVIDIA GPU Operator v26.7.2 with the driver and toolkit turned off (the AMI has them): device plugin so pods can request `nvidia.com/gpu`, GPU feature discovery labels (`nvidia.com/gpu.product`, ...), and the DCGM exporter, scraped by the `nvidia-dcgm-exporter` job in [`kubernetes/prometheus/`](kubernetes/prometheus/). Optional GPU time-slicing is commented in `values.yaml` |
+| `workload` | Runs one container on GPUs as a `Job` (training, batch) or a `Deployment` plus Service (inference). Sets the GPU limit, the GPU toleration, a memory-backed `/dev/shm` for PyTorch and NCCL, and for Jobs `karpenter.sh/do-not-disrupt` so Karpenter doesn't move a running job. Defaults to NVIDIA's CUDA vector-add sample as a smoke test |
+
+```bash
+helm dependency build kubernetes/gpu/operator
+helm install gpu-operator kubernetes/gpu/operator -n gpu-operator --create-namespace --wait
+
+# Smoke test: launches a GPU node, prints "Test PASSED"
+helm install gpu-smoke kubernetes/gpu/workload
+kubectl logs job/gpu-smoke-gpu-workload -f
+
+# An inference server on 1 GPU
+helm install llm kubernetes/gpu/workload --set kind=Deployment \
+  --set image.repository=vllm/vllm-openai --set image.tag=<version> \
+  --set 'args={--model,Qwen/Qwen2.5-1.5B-Instruct}'
+```
+
+[`kubernetes/karpenter/`](kubernetes/karpenter/) adds node autoscaling on EKS with [Karpenter](https://karpenter.sh/): a default `NodePool` (spot and on-demand c/m/r instances, gen 5+, capped at 100 CPU / 400Gi, consolidates empty or underused nodes) and an `EC2NodeClass` (AL2023 AMI, IMDSv2, subnets and security groups found by the `karpenter.sh/discovery` tag). When the API's HPA adds pods that don't fit, Karpenter launches nodes for them.
 
 Karpenter itself must be installed first, including its IAM roles, interruption queue, and discovery tags; follow the [Getting Started guide](https://karpenter.sh/docs/getting-started/getting-started-with-karpenter/). Then apply the manifests with your cluster name filled in:
 

@@ -1,0 +1,44 @@
+# Values for the upstream nvidia/gpu-operator chart
+gpu-operator:
+  # The EKS AL2023 NVIDIA AMI (picked by Karpenter's al2023 alias for GPU instance
+  # types, see kubernetes/karpenter/gpu-nodepool.yaml) already has the NVIDIA driver
+  # and container toolkit, with containerd set up to use them
+  driver:
+    enabled: false
+  toolkit:
+    enabled: false
+  # CDI needs the operator-managed toolkit; rely on the AMI's nvidia runtime instead
+  cdi:
+    enabled: false
+
+  # Labels nodes with PCI/CPU features; GPU feature discovery builds on it to add
+  # nvidia.com/gpu.product, nvidia.com/gpu.memory, etc.
+  nfd:
+    enabled: true
+  gfd:
+    enabled: true
+
+  devicePlugin:
+    enabled: true
+    # Uncomment to share each GPU between up to 4 pods (time-slicing). Pods get no
+    # memory or fault isolation from each other; use MIG on A100/H100 for that.
+    # config:
+    #   create: true
+    #   name: time-slicing
+    #   default: shared
+    #   data:
+    #     shared: |-
+    #       version: v1
+    #       sharing:
+    #         timeSlicing:
+    #           resources:
+    #             - name: nvidia.com/gpu
+    #               replicas: 4
+
+  # GPU utilization, memory, temperature, and power metrics on :9400. Scraped by the
+  # nvidia-dcgm-exporter job in kubernetes/prometheus, so no ServiceMonitor (which
+  # would need the Prometheus Operator's CRDs)
+  dcgmExporter:
+    enabled: true
+    serviceMonitor:
+      enabled: false

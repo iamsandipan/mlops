@@ -1,0 +1,77 @@
+# Job for run-to-completion work (training, batch inference, evaluation);
+# Deployment for long-running servers (online inference)
+kind: Job
+
+# Default runs NVIDIA's CUDA vector-add sample, a quick check that GPUs work
+image:
+  repository: nvcr.io/nvidia/k8s/cuda-sample
+  tag: vectoradd-cuda12.5.0
+  pullPolicy: IfNotPresent
+
+command: []
+args: []
+
+# GPUs per pod (nvidia.com/gpu). Karpenter launches a GPU node that fits.
+gpus: 1
+
+resources:
+  requests:
+    cpu: "2"
+    memory: 8Gi
+  limits:
+    memory: 8Gi
+
+# PyTorch DataLoader workers and NCCL share data through /dev/shm, which is only
+# 64Mi by default in containers. Backed by node memory; counts toward the pod's limit.
+shmSize: 2Gi
+
+env: []
+# Load settings and credentials, e.g. from kubernetes/configmaps or kubernetes/secret-rotation
+envFrom: []
+#  - configMapRef:
+#      name: training-config
+#  - secretRef:
+#      name: hf-token
+
+# GPU nodes are tainted so only pods that ask for GPUs land on them
+tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+
+# e.g. pin a GPU model: nvidia.com/gpu.product: NVIDIA-A10G (label from GPU feature discovery)
+nodeSelector: {}
+affinity: {}
+
+podAnnotations: {}
+podLabels: {}
+
+# Extra volumes, e.g. a PVC holding datasets or model weights
+volumes: []
+volumeMounts: []
+
+serviceAccount:
+  create: true
+  name: ""
+
+job:
+  # Retries before the Job is marked failed
+  backoffLimit: 2
+  # Delete the finished Job and its pods after 1 day
+  ttlSecondsAfterFinished: 86400
+  # Kill the Job if it runs longer than this; 0 means no limit
+  activeDeadlineSeconds: 0
+  # Keep Karpenter from moving a running Job to a cheaper node mid-run
+  doNotDisrupt: true
+
+deployment:
+  replicas: 1
+  # Port the server listens on; also exposed by a ClusterIP Service
+  port: 8000
+  # Model servers can take minutes to load weights
+  readinessProbe: {}
+  #  httpGet:
+  #    path: /health
+  #    port: http
+  #  initialDelaySeconds: 30
+  #  periodSeconds: 10

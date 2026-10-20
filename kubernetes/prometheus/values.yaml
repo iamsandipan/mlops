@@ -123,6 +123,20 @@ config:
         - source_labels: [__meta_kubernetes_pod_name]
           target_label: pod
 
+    # GPU metrics from the DCGM exporter in kubernetes/gpu/operator, one target per
+    # GPU node (DCGM_FI_DEV_GPU_UTIL, DCGM_FI_DEV_FB_USED, ...)
+    - job_name: nvidia-dcgm-exporter
+      kubernetes_sd_configs:
+        - role: endpoints
+          namespaces:
+            names: [gpu-operator]
+      relabel_configs:
+        - source_labels: [__meta_kubernetes_service_name]
+          action: keep
+          regex: nvidia-dcgm-exporter
+        - source_labels: [__meta_kubernetes_pod_node_name]
+          target_label: node
+
 # Alerting/recording rules (rules.yml)
 rules:
   groups: []

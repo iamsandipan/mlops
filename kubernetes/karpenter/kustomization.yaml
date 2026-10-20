@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - ec2nodeclass.yaml
   - nodepool.yaml
+  - gpu-nodepool.yaml
