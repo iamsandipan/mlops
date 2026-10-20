@@ -1,0 +1,4 @@
+# Values for the upstream istio/base chart
+base:
+  # Revision that istioctl and the validation webhook treat as the default
+  defaultRevision: default

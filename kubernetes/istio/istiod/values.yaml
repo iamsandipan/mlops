@@ -1,0 +1,51 @@
+# Mesh-wide mutual TLS between sidecars. PERMISSIVE accepts both mTLS and plain
+# text, so workloads without a sidecar can still call meshed ones; switch to
+# STRICT once every client has a sidecar. Empty skips the PeerAuthentication.
+mtls:
+  mode: PERMISSIVE
+
+# Values for the upstream istio/istiod chart
+istiod:
+  # At least 2 replicas, in different AZs, so a node or AZ loss doesn't stop
+  # config pushes and certificate signing
+  autoscaleEnabled: true
+  autoscaleMin: 2
+  autoscaleMax: 5
+  pdb:
+    minAvailable: 1
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app: istiod
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+
+  meshConfig:
+    # Envoy access logs on the proxies' stdout
+    accessLogFile: /dev/stdout
+    # Sidecars serve the app's Prometheus metrics merged with their own on :15020,
+    # rewriting the prometheus.io annotations, so the kubernetes-pods scrape job in
+    # kubernetes/prometheus keeps working under STRICT mTLS
+    enablePrometheusMerge: true
+
+  global:
+    # Set per cluster. Every cluster in the mesh shares meshID; clusterName and
+    # network identify this one. Needed for a multi-cluster (multi-region) mesh later.
+    meshID: mlops
+    multiCluster:
+      clusterName: mlops-us-east-1
+    network: mlops-us-east-1
+
+    proxy:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 512Mi

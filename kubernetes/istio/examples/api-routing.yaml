@@ -1,0 +1,41 @@
+# Routes HTTP traffic from the ingress gateway's NLB to the API in kubernetes/api.
+# The API's namespace needs sidecar injection first:
+#   kubectl label namespace default istio-injection=enabled
+#   kubectl rollout restart deployment/api
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: api
+  namespace: default
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*"   # replace with your domain, e.g. api.example.com
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: api
+  namespace: default
+spec:
+  hosts:
+    - "*"
+  gateways:
+    - api
+  http:
+    - route:
+        - destination:
+            host: api.default.svc.cluster.local
+            port:
+              number: 80
+      timeout: 10s
+      retries:
+        attempts: 3
+        perTryTimeout: 3s
+        retryOn: 5xx,reset,connect-failure

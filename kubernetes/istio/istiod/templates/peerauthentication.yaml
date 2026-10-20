@@ -1,0 +1,12 @@
+{{- with .Values.mtls.mode }}
+# Mesh-wide policy: a PeerAuthentication named "default" in the root namespace
+# applies to every workload. Namespaces and workloads can override it.
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: {{ $.Values.istiod.global.istioNamespace | default "istio-system" }}
+spec:
+  mtls:
+    mode: {{ . }}
+{{- end }}

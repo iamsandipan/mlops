@@ -89,6 +89,25 @@ kubectl -n vault exec -it vault-0 -- vault operator init   # prints recovery key
 
 The other pods join through `retry_join` and every pod unseals itself with KMS on start. Vault serves plain HTTP inside the cluster; configure TLS in the listener before production use.
 
+[`kubernetes/istio/`](kubernetes/istio/) installs the [Istio](https://istio.io/) service mesh (1.30.6) as three Helm charts wrapping the upstream ones. They must be installed in order, as separate releases, because istiod needs Istio's CRDs and the gateway pods need istiod's injection webhook to be running:
+
+| Chart | What it installs |
+| --- | --- |
+| `base` | Istio CRDs and cluster-wide resources |
+| `istiod` | Control plane, 2–5 replicas spread across AZs, access logs, Prometheus metrics merging, and a mesh-wide `PeerAuthentication` (`mtls.mode`, default `PERMISSIVE`; switch to `STRICT` once every client has a sidecar). `global.meshID`, `global.multiCluster.clusterName`, and `global.network` identify the cluster for a future multi-cluster mesh |
+| `gateway` | Ingress gateway (`istio: ingressgateway`) behind an internet-facing AWS NLB, 2–10 replicas spread across AZs |
+
+```bash
+for c in base istiod gateway; do helm dependency build kubernetes/istio/$c; done
+helm install istio-base kubernetes/istio/base -n istio-system --create-namespace --wait
+helm install istiod kubernetes/istio/istiod -n istio-system --wait \
+  --set istiod.global.multiCluster.clusterName=mlops-us-east-1 \
+  --set istiod.global.network=mlops-us-east-1
+helm install istio-ingress kubernetes/istio/gateway -n istio-ingress --create-namespace --wait
+```
+
+[`examples/api-routing.yaml`](kubernetes/istio/examples/api-routing.yaml) routes traffic from the gateway to the API in `kubernetes/api/`, with a timeout and retries; label the namespace `istio-injection=enabled` and restart the API so its pods get sidecars.
+
 [`kubernetes/karpenter/`](kubernetes/karpenter/) adds node autoscaling on EKS with [Karpenter](https://karpenter.sh/): a `NodePool` (spot and on-demand c/m/r instances, gen 5+, capped at 100 CPU / 400Gi, consolidates empty or underused nodes) and an `EC2NodeClass` (AL2023 AMI, IMDSv2, subnets and security groups found by the `karpenter.sh/discovery` tag). When the API's HPA adds pods that don't fit, Karpenter launches nodes for them.
 
 Karpenter itself must be installed first, including its IAM roles, interruption queue, and discovery tags; follow the [Getting Started guide](https://karpenter.sh/docs/getting-started/getting-started-with-karpenter/). Then apply the manifests with your cluster name filled in:
