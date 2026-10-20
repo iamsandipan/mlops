@@ -1,5 +1,5 @@
 # Shared by the IAM roles that pods assume through EKS Pod Identity
-# (external-secrets.tf, vault.tf)
+# (external-secrets.tf, vault.tf, ebs-csi.tf)
 
 data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}

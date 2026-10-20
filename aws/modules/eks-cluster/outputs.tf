@@ -45,3 +45,8 @@ output "vault_role_arn" {
   description = "IAM role Vault assumes through Pod Identity"
   value       = one(aws_iam_role.vault[*].arn)
 }
+
+output "ebs_csi_role_arn" {
+  description = "IAM role the EBS CSI driver controller assumes through Pod Identity"
+  value       = aws_iam_role.ebs_csi.arn
+}

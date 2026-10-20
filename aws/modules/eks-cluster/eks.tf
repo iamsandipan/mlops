@@ -25,6 +25,20 @@ module "eks" {
     eks-pod-identity-agent = {
       before_compute = true
     }
+    # Provisions EBS volumes for PersistentVolumeClaims (Vault, Prometheus, ...)
+    aws-ebs-csi-driver = {
+      pod_identity_association = [{
+        role_arn        = aws_iam_role.ebs_csi.arn
+        service_account = "ebs-csi-controller-sa"
+      }]
+      # Creates a default gp3 StorageClass (ebs-csi-default-sc), so PVCs that
+      # don't name a class get a volume; recent EKS versions have no default
+      configuration_values = jsonencode({
+        defaultStorageClass = {
+          enabled = true
+        }
+      })
+    }
   }
 
   # Baseline nodes spread across the 3 AZs. They run cluster add-ons and the
