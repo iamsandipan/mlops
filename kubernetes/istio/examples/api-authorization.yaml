@@ -1,0 +1,30 @@
+# Only lets known callers reach the API in kubernetes/api. Callers are identified
+# by the service account in their mTLS certificate (SPIFFE ID
+# cluster.local/ns/<namespace>/sa/<service-account>), so this depends on mTLS:
+# apply mtls-strict.yaml first, or plain-text callers have no identity to match.
+#
+# With an ALLOW policy on a workload, requests that match no rule are denied (403
+# "RBAC: access denied"). Health checks and metrics scraping are unaffected.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: api
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: api
+  action: ALLOW
+  rules:
+    # External traffic, through the ingress gateway from kubernetes/istio/gateway
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/istio-ingress/sa/istio-ingressgateway
+    # Other workloads in the same namespace, read-only
+    - from:
+        - source:
+            namespaces: ["default"]
+      to:
+        - operation:
+            methods: ["GET", "HEAD"]

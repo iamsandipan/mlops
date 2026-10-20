@@ -106,7 +106,7 @@ helm install istiod kubernetes/istio/istiod -n istio-system --wait \
 helm install istio-ingress kubernetes/istio/gateway -n istio-ingress --create-namespace --wait
 ```
 
-[`examples/api-routing.yaml`](kubernetes/istio/examples/api-routing.yaml) routes traffic from the gateway to the API in `kubernetes/api/`, with a timeout and retries; label the namespace `istio-injection=enabled` and restart the API so its pods get sidecars.
+[`examples/api-routing.yaml`](kubernetes/istio/examples/api-routing.yaml) routes traffic from the gateway to the API in `kubernetes/api/`, with a timeout and retries; label the namespace `istio-injection=enabled` and restart the API so its pods get sidecars. To enforce mTLS, apply [`examples/mtls-strict.yaml`](kubernetes/istio/examples/mtls-strict.yaml) (STRICT for one namespace, with pre-checks and a test in its comments), then [`examples/api-authorization.yaml`](kubernetes/istio/examples/api-authorization.yaml), which lets only the ingress gateway, and read-only callers in the same namespace, reach the API based on their mTLS identity.
 
 [`kubernetes/gpu/`](kubernetes/gpu/) runs workloads on NVIDIA GPUs. GPU nodes come from the `gpu` Karpenter pool in [`kubernetes/karpenter/`](kubernetes/karpenter/) (g5/g6/g6e, tainted `nvidia.com/gpu`, at most 16 GPUs, removed after 5 idle minutes), which boots the EKS NVIDIA AMI with the driver and container toolkit preinstalled.
 

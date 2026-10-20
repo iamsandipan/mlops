@@ -1,0 +1,24 @@
+# Enforces mutual TLS for every workload in the "default" namespace: plain-text
+# connections to its pods are refused. Roll out one namespace at a time, then
+# enforce mesh-wide with:
+#   helm upgrade istiod kubernetes/istio/istiod -n istio-system --reuse-values --set mtls.mode=STRICT
+#
+# Before applying, make sure every caller has a sidecar:
+#   kubectl get pods -A -o json | jq -r '.items[] | select(all(.spec.containers[]; .name != "istio-proxy")) | "\(.metadata.namespace)/\(.metadata.name)"'
+# and that Prometheus shows no plain-text traffic into the namespace:
+#   sum by (source_workload, source_workload_namespace) (rate(istio_requests_total{destination_workload_namespace="default", connection_security_policy="none"}[5m]))
+#
+# After applying, a pod without a sidecar should be refused:
+#   kubectl run plain --rm -it -n vault --image=curlimages/curl --restart=Never -- curl -sv --max-time 5 http://api.default
+#   -> "Connection reset by peer"
+#
+# Prometheus scraping and kubelet probes keep working: the sidecar serves merged
+# metrics on :15020 and Istio rewrites probes, both outside mTLS enforcement.
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: default
+spec:
+  mtls:
+    mode: STRICT
