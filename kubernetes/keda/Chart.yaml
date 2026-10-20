@@ -1,0 +1,10 @@
+apiVersion: v2
+name: keda
+description: KEDA event-driven autoscaling (scale on queues, Prometheus queries, cron, and more, down to zero), with HA and Prometheus metrics
+type: application
+version: 0.1.0
+appVersion: "2.21.0"
+dependencies:
+  - name: keda
+    version: 2.21.0
+    repository: https://kedacore.github.io/charts

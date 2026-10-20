@@ -1,0 +1,81 @@
+# Runs one GPU Job per message on an SQS queue, and nothing when the queue is
+# empty. With the Karpenter gpu pool (kubernetes/karpenter/gpu-nodepool.yaml) GPU
+# nodes only exist while there's work: messages arrive -> KEDA creates Jobs ->
+# Karpenter launches GPU nodes -> jobs finish -> idle nodes are removed after 5 min.
+#
+# Needs:
+# - The KEDA operator's IAM role from aws/modules/eks-cluster/keda.tf, which can
+#   read the queue length of queues named mlops-* (used by the TriggerAuthentication)
+# - The NVIDIA GPU Operator (kubernetes/gpu/operator)
+# - An IAM role for the worker itself (service account gpu-batch) with
+#   sqs:ReceiveMessage and sqs:DeleteMessage on the queue, via Pod Identity
+#
+# Replace <ACCOUNT_ID>, the region, and the image.
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: keda-operator-aws
+  namespace: default
+spec:
+  # Use the KEDA operator's own AWS credentials (EKS Pod Identity)
+  podIdentity:
+    provider: aws
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata:
+  name: gpu-batch-inference
+  namespace: default
+spec:
+  pollingInterval: 30
+  minReplicaCount: 0
+  # Up to 8 concurrent jobs; the gpu pool is capped at 16 GPUs
+  maxReplicaCount: 8
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 5
+  jobTargetRef:
+    backoffLimit: 2
+    activeDeadlineSeconds: 3600
+    template:
+      metadata:
+        annotations:
+          # Don't let Karpenter consolidate the node mid-job
+          karpenter.sh/do-not-disrupt: "true"
+      spec:
+        restartPolicy: Never
+        serviceAccountName: gpu-batch
+        containers:
+          - name: worker
+            # Reads one message, processes it, deletes it, exits
+            image: <your-registry>/gpu-batch-worker:latest
+            env:
+              - name: QUEUE_URL
+                value: https://sqs.us-east-1.amazonaws.com/<ACCOUNT_ID>/mlops-gpu-jobs
+            resources:
+              requests:
+                cpu: "2"
+                memory: 8Gi
+              limits:
+                memory: 8Gi
+                nvidia.com/gpu: 1
+            volumeMounts:
+              - name: dshm
+                mountPath: /dev/shm
+        volumes:
+          - name: dshm
+            emptyDir:
+              medium: Memory
+              sizeLimit: 2Gi
+        tolerations:
+          - key: nvidia.com/gpu
+            operator: Exists
+            effect: NoSchedule
+  triggers:
+    - type: aws-sqs-queue
+      authenticationRef:
+        name: keda-operator-aws
+      metadata:
+        queueURL: https://sqs.us-east-1.amazonaws.com/<ACCOUNT_ID>/mlops-gpu-jobs
+        awsRegion: us-east-1
+        # One job per message (counts visible and in-flight messages)
+        queueLength: "1"

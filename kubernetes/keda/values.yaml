@@ -1,0 +1,61 @@
+# Values for the upstream kedacore/keda chart
+keda:
+  # Only one operator and one metrics server are active at a time (leader
+  # election); a second replica in another AZ cuts failover time. Webhooks are
+  # stateless and all serve.
+  operator:
+    replicaCount: 2
+  metricsServer:
+    replicaCount: 2
+  webhooks:
+    replicaCount: 2
+
+  podDisruptionBudget:
+    operator:
+      minAvailable: 1
+    metricServer:
+      minAvailable: 1
+    webhooks:
+      minAvailable: 1
+
+  topologySpreadConstraints:
+    operator:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: keda-operator
+    metricsServer:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: keda-operator-metrics-apiserver
+    webhooks:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: keda-admission-webhooks
+
+  # The operator's AWS identity comes from the EKS Pod Identity association in
+  # aws/modules/eks-cluster/keda.tf (service account keda/keda-operator), used by
+  # TriggerAuthentications with podIdentity.provider: aws. No IRSA annotation needed.
+  serviceAccount:
+    operator:
+      name: keda-operator
+
+  # Scaler health and latency metrics (keda_scaler_errors_total,
+  # keda_scaler_metrics_latency_seconds, ...) on :8080, picked up by the
+  # kubernetes-pods job in kubernetes/prometheus
+  prometheus:
+    operator:
+      enabled: true
+      port: 8080
+  podAnnotations:
+    keda:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "8080"

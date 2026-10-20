@@ -1,0 +1,40 @@
+# Values for the upstream metrics-server chart
+metrics-server:
+  # Two replicas on different nodes and AZs: if metrics-server is down, every HPA
+  # stops scaling. Both replicas serve; the API server load-balances between them.
+  # Needs at least 2 nodes; on a single-node cluster set replicas: 1.
+  replicas: 2
+
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: metrics-server
+
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: metrics-server
+
+  # Roughly 1m CPU and 2Mi memory per node; this covers ~100 nodes
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+    limits:
+      memory: 400Mi
+
+  # On minikube or kind, kubelets use self-signed serving certificates; uncomment
+  # (or use `minikube addons enable metrics-server` instead of this chart).
+  # Not needed on EKS.
+  # args:
+  #   - --kubelet-insecure-tls

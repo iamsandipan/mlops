@@ -1,0 +1,10 @@
+apiVersion: v2
+name: metrics-server
+description: Kubernetes metrics-server in HA, serving the CPU and memory metrics that HPA, VPA, KEDA cpu/memory triggers, and kubectl top rely on
+type: application
+version: 0.1.0
+appVersion: "0.9.0"
+dependencies:
+  - name: metrics-server
+    version: 3.14.0
+    repository: https://kubernetes-sigs.github.io/metrics-server/

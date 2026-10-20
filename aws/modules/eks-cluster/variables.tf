@@ -88,3 +88,21 @@ variable "vault_service_account" {
   type        = string
   default     = "vault"
 }
+
+variable "enable_keda" {
+  description = "Create the IAM role and Pod Identity association for the KEDA operator"
+  type        = bool
+  default     = true
+}
+
+variable "keda_namespace" {
+  description = "Namespace KEDA is installed in"
+  type        = string
+  default     = "keda"
+}
+
+variable "keda_sqs_queue_prefixes" {
+  description = "SQS queue names KEDA may read the length of, as ARN name patterns in this region"
+  type        = list(string)
+  default     = ["mlops-*"]
+}

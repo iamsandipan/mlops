@@ -56,7 +56,7 @@ Plain manifests for an API live in [`kubernetes/api/`](kubernetes/api/): a Deplo
 kubectl apply -k kubernetes/api
 ```
 
-The HPA needs metrics-server (`minikube addons enable metrics-server`). The VPA needs the [Vertical Pod Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler) installed; without it, `kubectl apply` fails on `vpa.yaml`.
+The HPA needs metrics-server ([`kubernetes/metrics-server/`](kubernetes/metrics-server/), or `minikube addons enable metrics-server` locally). The VPA needs the [Vertical Pod Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler) installed; without it, `kubectl apply` fails on `vpa.yaml`.
 
 [`kubernetes/secret-rotation/`](kubernetes/secret-rotation/) is a Helm chart that keeps Kubernetes Secrets in sync with AWS Secrets Manager using the [External Secrets Operator](https://external-secrets.io/) (ESO). Rotate a secret in Secrets Manager and ESO writes the new value into the Kubernetes Secret within `refreshInterval` (default 1h). It can also generate in-cluster passwords that ESO replaces every `rotateEvery`, for values only the cluster uses, such as session signing keys. List secrets under `secrets` and `generated` in `values.yaml`.
 
@@ -129,6 +129,26 @@ helm install llm kubernetes/gpu/workload --set kind=Deployment \
   --set 'args={--model,Qwen/Qwen2.5-1.5B-Instruct}'
 ```
 
+[`kubernetes/keda/`](kubernetes/keda/) installs [KEDA](https://keda.sh/) 2.21.0, which scales workloads on events (queue length, Prometheus queries, cron, and 70+ other sources), including down to zero. It runs 2 replicas each of the operator, metrics server, and webhooks across AZs, exposes scaler metrics to Prometheus, and gets AWS access from the Pod Identity role in [`aws/`](aws/).
+
+```bash
+helm dependency build kubernetes/keda
+helm install keda kubernetes/keda -n keda --create-namespace --wait
+```
+
+| Example | What it does |
+| --- | --- |
+| [`api-scaledobject.yaml`](kubernetes/keda/examples/api-scaledobject.yaml) | Scales the API on Istio request rate (50 req/s per replica) and CPU. KEDA owns the API's HPA, so delete `kubernetes/api/hpa.yaml` first |
+| [`gpu-sqs-scaledjob.yaml`](kubernetes/keda/examples/gpu-sqs-scaledjob.yaml) | Runs one GPU Job per SQS message and none when the queue is empty, so Karpenter only keeps GPU nodes while there's work |
+
+[`kubernetes/metrics-server/`](kubernetes/metrics-server/) installs [metrics-server](https://github.com/kubernetes-sigs/metrics-server) 0.9.0, which serves the CPU and memory usage behind HPAs, the VPA, KEDA `cpu`/`memory` triggers, and `kubectl top`. It runs 2 replicas on different nodes and AZs with a disruption budget, since every HPA stops scaling while it's down. Install it first on EKS; on minikube use the addon, or set `metrics-server.replicas=1` and uncomment `--kubelet-insecure-tls`.
+
+```bash
+helm dependency build kubernetes/metrics-server
+helm install metrics-server kubernetes/metrics-server -n kube-system --wait
+kubectl top nodes
+```
+
 [`kubernetes/karpenter/`](kubernetes/karpenter/) adds node autoscaling on EKS with [Karpenter](https://karpenter.sh/): a default `NodePool` (spot and on-demand c/m/r instances, gen 5+, capped at 100 CPU / 400Gi, consolidates empty or underused nodes) and an `EC2NodeClass` (AL2023 AMI, IMDSv2, subnets and security groups found by the `karpenter.sh/discovery` tag). When the API's HPA adds pods that don't fit, Karpenter launches nodes for them.
 
 Karpenter itself must be installed first, including its IAM roles, interruption queue, and discovery tags; follow the [Getting Started guide](https://karpenter.sh/docs/getting-started/getting-started-with-karpenter/). Then apply the manifests with your cluster name filled in:
@@ -155,6 +175,7 @@ Per cluster:
 - **EKS**: control plane in the intra subnets, nodes in the private subnets, public API endpoint, core add-ons (CoreDNS, kube-proxy, VPC CNI, Pod Identity Agent), the EBS CSI driver with its own Pod Identity IAM role and a default gp3 StorageClass `ebs-csi-default-sc` (so PVCs from Vault, Prometheus, etc. get volumes), and a managed node group of `m6i.large` (2–5 nodes, 3 desired).
 - **External Secrets IAM**: a role `<cluster_name>-external-secrets` that can read Secrets Manager secrets matching `external_secrets_secret_prefixes` (default `mlops/*`) in the cluster's region, linked by EKS Pod Identity to the `external-secrets` service account in the `external-secrets` namespace. Used by [`kubernetes/secret-rotation/`](kubernetes/secret-rotation/). Add `external_secrets_kms_key_arns` if the secrets use a customer-managed KMS key.
 - **Vault KMS**: a KMS key `alias/vault-unseal-<cluster_name>` (yearly rotation, 30-day deletion window) and a role `<cluster_name>-vault` allowed to encrypt and decrypt with it, linked by EKS Pod Identity to the `vault` service account in the `vault` namespace. Used by [`kubernetes/vault/`](kubernetes/vault/) for auto-unseal.
+- **KEDA IAM**: a role `<cluster_name>-keda` that can read the length of SQS queues matching `keda_sqs_queue_prefixes` (default `mlops-*`), linked by EKS Pod Identity to the `keda-operator` service account in the `keda` namespace. Used by [`kubernetes/keda/`](kubernetes/keda/) scalers with `podIdentity.provider: aws`.
 - Private subnets and the node security group are tagged `karpenter.sh/discovery=<cluster_name>`, matching [`kubernetes/karpenter/`](kubernetes/karpenter/) (set `CLUSTER_NAME` to the region's cluster when applying it).
 
 ```bash

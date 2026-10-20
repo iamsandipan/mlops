@@ -50,3 +50,8 @@ output "ebs_csi_role_arn" {
   description = "IAM role the EBS CSI driver controller assumes through Pod Identity"
   value       = aws_iam_role.ebs_csi.arn
 }
+
+output "keda_role_arn" {
+  description = "IAM role the KEDA operator assumes through Pod Identity"
+  value       = one(aws_iam_role.keda[*].arn)
+}

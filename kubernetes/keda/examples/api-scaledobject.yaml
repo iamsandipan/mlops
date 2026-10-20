@@ -1,0 +1,39 @@
+# Scales the API in kubernetes/api on request rate (from Istio sidecar metrics in
+# kubernetes/prometheus) as well as CPU. Request rate reacts before CPU climbs,
+# which matters for I/O-bound APIs that wait on databases or other services.
+#
+# KEDA creates and owns the HPA for the API, so remove the API's own HPA first,
+# or the two will fight over the replica count:
+#   kubectl delete hpa api -n default
+#   and drop hpa.yaml from kubernetes/api/kustomization.yaml
+# The API's VPA only manages memory, so it can stay.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: api
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: api
+  minReplicaCount: 2
+  maxReplicaCount: 10
+  pollingInterval: 15
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 300
+  triggers:
+    # Target 50 requests/second per replica
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus.monitoring.svc:9090
+        query: |
+          sum(rate(istio_requests_total{reporter="destination", destination_workload="api", destination_workload_namespace="default"}[2m]))
+        threshold: "50"
+        # Without traffic data (e.g. Prometheus down), fall back to CPU alone
+        ignoreNullValues: "true"
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "70"
